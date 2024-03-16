@@ -37,7 +37,6 @@ async fn main() {
     let init_params = InitializeParams {
         process_id: None, // Super important to set it to NONE https://github.com/typescript-language-server/typescript-language-server/issues/262
         root_uri: Some(Url::parse(&working_directory).unwrap()),
-        root_path: None,
         initialization_options: Some(serde_json::json!({
             "hostInfo": "vscode",
             "maxTsServerMemory": 4096 * 2,
@@ -163,13 +162,14 @@ async fn main() {
         work_done_progress_params: WorkDoneProgressParams {
             work_done_token: Some(lsp_types::NumberOrString::Number(2)),
         },
+        ..Default::default()
     };
 
     let (tx, rx) = oneshot::channel();
     lang_server
         .send_request("initialize", &json!(init_params), |result| {
             println!("received response {:?}", result);
-            tx.send(result);
+            tx.send(result).unwrap();
         })
         .await;
     let result = rx.await;

@@ -24,7 +24,7 @@ impl<F: Send + FnOnce(Result<Value, Value>)> Callable for F {
 
 type Callback = Box<dyn Callable>;
 
-/// Represents (and mediates communcation with) a Language Server.
+/// Represents (and mediates communication with) a Language Server.
 ///
 /// LanguageServer should only ever be instantiated or accessed through an instance of
 /// LanguageServerRef, which mediates access to a single shared LanguageServer through a Mutex.
@@ -103,7 +103,7 @@ impl<W: AsyncWriteExt + Unpin> LanguageServer<W> {
 /// Access control and convenience wrapper around a shared LanguageServer instance.
 pub struct LanguageServerRef<W: AsyncWriteExt>(Arc<Mutex<LanguageServer<W>>>);
 
-//FIXME: this is hacky, and prevents good error propogation,
+//FIXME: this is hacky, and prevents good error propagation,
 fn number_from_id(id: Option<&Value>) -> usize {
     let id = id.expect("response missing id field");
     let id = match id {
