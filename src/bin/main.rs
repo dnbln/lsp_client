@@ -33,10 +33,14 @@ async fn main() {
 
     let working_directory = "file:///Users/skcd/scratch/ide".to_owned();
 
+    let working_directory_uri = Url::parse(&working_directory).unwrap_or_else(|err| {
+        panic!("Failed converting directory name {working_directory} into a Url: {err}")
+    });
+
     // Prepare the initialize request
     let init_params = InitializeParams {
         process_id: None, // Super important to set it to NONE https://github.com/typescript-language-server/typescript-language-server/issues/262
-        root_uri: Some(Url::parse(&working_directory).unwrap()),
+        root_uri: Some(working_directory_uri.clone()),
         initialization_options: Some(serde_json::json!({
             "hostInfo": "vscode",
             "maxTsServerMemory": 4096 * 2,
@@ -156,7 +160,7 @@ async fn main() {
         client_info: None,
         locale: None,
         workspace_folders: Some(vec![WorkspaceFolder {
-            uri: Url::parse(&working_directory).unwrap(),
+            uri: working_directory_uri,
             name: "ide".to_string(),
         }]),
         work_done_progress_params: WorkDoneProgressParams {
@@ -169,18 +173,29 @@ async fn main() {
     lang_server
         .send_request("initialize", &json!(init_params), |result| {
             println!("received response {:?}", result);
-            tx.send(result).unwrap();
+            tx.send(result).expect("unable to send to receiver");
         })
         .await;
     let result = rx.await;
     dbg!(&result);
 
     // Now we send over the open text document notification
-    let file_name =
-        "/Users/skcd/scratch/ide/src/vs/editor/common/viewLayout/viewLayout.ts".to_owned();
-    let file_name_url =
-        "file:///Users/skcd/scratch/ide/src/vs/editor/common/viewLayout/viewLayout.ts".to_owned();
-    let file_contents = std::fs::read_to_string(file_name).expect("to work");
+    let file_name = std::path::PathBuf::from(
+        "/Users/skcd/scratch/ide/src/vs/editor/common/viewLayout/viewLayout.ts",
+    );
+    let absolute_file_name = file_name.canonicalize().unwrap_or_else(|err| {
+        panic!(
+            "Failed getting absolute path for {}: {err}",
+            file_name.display()
+        )
+    });
+    let file_name_url = format!("file://{}", absolute_file_name.display());
+    let file_name_uri = Url::parse(&file_name_url).unwrap_or_else(|err| {
+        panic!("Failed converting file name {file_name_url} into a Url: {err}")
+    });
+    let file_contents = std::fs::read_to_string(file_name.clone())
+        .unwrap_or_else(|err| panic!("Failed to read file {}: {err}", file_name.display()));
+
     lang_server
         .send_notification(
             "textDocument/didOpen",
@@ -202,9 +217,7 @@ async fn main() {
     };
     let go_to_definition_request = GotoDefinitionParams {
         text_document_position_params: TextDocumentPositionParams {
-            text_document: TextDocumentIdentifier {
-                uri: Url::parse(&file_name_url).unwrap(),
-            },
+            text_document: TextDocumentIdentifier { uri: file_name_uri },
             position,
         },
         work_done_progress_params: Default::default(),
@@ -217,7 +230,7 @@ async fn main() {
             &json!(go_to_definition_request),
             |result| {
                 println!("received response goto definition {:?}", result);
-                let _ = tx.send(result);
+                tx.send(result).expect("unable to send to receiver");
             },
         )
         .await;
