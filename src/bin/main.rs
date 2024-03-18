@@ -28,13 +28,36 @@ use url::Url;
 
 #[tokio::main]
 async fn main() {
+    let mut args = std::env::args();
+    let file_name = std::path::PathBuf::from(args.nth(1).expect("No filename argument supplied"));
+    let absolute_file_name = file_name.canonicalize().unwrap_or_else(|err| {
+        panic!(
+            "Failed getting absolute path for {}: {err}",
+            file_name.display()
+        )
+    });
+    let file_name_url = format!("file://{}", absolute_file_name.display());
+
     println!("starting main read loop");
     let (_child, lang_server) = start_language_server(prepare_command()).await;
 
-    let working_directory = "file:///Users/skcd/scratch/ide".to_owned();
+    let working_directory = std::env::current_dir().expect("Unable to get current directory");
+    eprintln!("cwd: {}", working_directory.display());
 
-    let working_directory_uri = Url::parse(&working_directory).unwrap_or_else(|err| {
-        panic!("Failed converting directory name {working_directory} into a Url: {err}")
+    if !absolute_file_name.starts_with(working_directory.clone()) {
+        eprintln!(
+            "{} must reside under the current working directory.",
+            absolute_file_name.display()
+        );
+        std::process::exit(1);
+    }
+
+    let working_directory_url = format!("file://{}", working_directory.display());
+    let working_directory_uri = Url::parse(&working_directory_url).unwrap_or_else(|err| {
+        panic!(
+            "Failed converting directory name {} into a Url: {err}",
+            working_directory.display()
+        )
     });
 
     // Prepare the initialize request
@@ -180,16 +203,6 @@ async fn main() {
     dbg!(&result);
 
     // Now we send over the open text document notification
-    let file_name = std::path::PathBuf::from(
-        "/Users/skcd/scratch/ide/src/vs/editor/common/viewLayout/viewLayout.ts",
-    );
-    let absolute_file_name = file_name.canonicalize().unwrap_or_else(|err| {
-        panic!(
-            "Failed getting absolute path for {}: {err}",
-            file_name.display()
-        )
-    });
-    let file_name_url = format!("file://{}", absolute_file_name.display());
     let file_name_uri = Url::parse(&file_name_url).unwrap_or_else(|err| {
         panic!("Failed converting file name {file_name_url} into a Url: {err}")
     });
