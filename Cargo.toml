@@ -13,3 +13,7 @@ futures = "0.3.28"
 lsp-types = "0.95.0"
 url = "2.5.0"
 jsonrpc-lite = "0.6.0"
+
+[[bin]]
+name = "lsp_client"
+path = "src/bin/main.rs"
