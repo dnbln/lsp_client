@@ -180,11 +180,17 @@ impl<W: AsyncWriteExt> Clone for LanguageServerRef<W> {
 pub async fn start_language_server(mut child: Child) -> (Child, LanguageServerRef<ChildStdin>) {
     let child_stdin = child.stdin.take().unwrap();
     let child_stdout = child.stdout.take().unwrap();
-    let lang_server = LanguageServerRef::new(child_stdin);
+
+    (child, start_language_server_with_io(child_stdin, child_stdout).await)
+}
+
+pub async fn start_language_server_with_io<R, W>(stdin: W, stdout: R) -> LanguageServerRef<W> where W: AsyncWriteExt, R: AsyncRead {
+    let lang_server = LanguageServerRef::new(stdin);
+
     {
         let lang_server = lang_server.clone();
         tokio::task::spawn(async move {
-            let mut reader = BufReader::new(child_stdout);
+            let mut reader = BufReader::new(stdout);
             loop {
                 match parsing::read_message(&mut reader).await {
                     Ok(ref val) => lang_server.handle_msg(val),
@@ -193,5 +199,6 @@ pub async fn start_language_server(mut child: Child) -> (Child, LanguageServerRe
             }
         });
     }
-    (child, lang_server)
+
+    lang_server
 }
