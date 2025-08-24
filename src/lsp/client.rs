@@ -185,7 +185,11 @@ pub async fn start_language_server(mut child: Child) -> (Child, LanguageServerRe
     (child, start_language_server_with_io(child_stdin, child_stdout).await)
 }
 
-pub async fn start_language_server_with_io<R, W>(stdin: W, stdout: R) -> LanguageServerRef<W> where W: AsyncWriteExt, R: AsyncRead {
+pub async fn start_language_server_with_io<R, W>(stdin: W, stdout: R) -> LanguageServerRef<W>
+where
+    W: AsyncWriteExt + Unpin + Send + 'static,
+    R: AsyncRead + Unpin + 'static,
+{
     let lang_server = LanguageServerRef::new(stdin);
 
     {
